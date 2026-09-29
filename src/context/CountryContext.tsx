@@ -1,6 +1,6 @@
 ﻿import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-export type Country = 'Botswana' | 'Kenya' | null;
+export type Country = 'Botswana' | 'Ghana' | 'Kenya' | 'Nigeria' | null;
 
 interface CountryContextValue {
   country: Country;
@@ -18,7 +18,7 @@ export function CountryProvider({ children }: { children: ReactNode }) {
   const [country, setCountryState] = useState<Country>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === 'Botswana' || stored === 'Kenya') return stored;
+      if (stored === 'Botswana' || stored === 'Ghana' || stored === 'Kenya' || stored === 'Nigeria') return stored;
       return null;
     } catch {
       return null;
@@ -43,3 +43,4 @@ export function CountryProvider({ children }: { children: ReactNode }) {
 export function useCountry() {
   return useContext(CountryContext);
 }
+

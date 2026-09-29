@@ -52,7 +52,9 @@ function CountrySelector() {
     >
       <option value="">All Africa</option>
       <option value="Botswana">Botswana</option>
+      <option value="Ghana">Ghana</option>
       <option value="Kenya">Kenya</option>
+      <option value="Nigeria">Nigeria</option>
     </select>
   );
 }
@@ -119,3 +121,4 @@ export function Layout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
