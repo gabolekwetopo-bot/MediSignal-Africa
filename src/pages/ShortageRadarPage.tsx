@@ -1,8 +1,11 @@
-﻿import { useMemo } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { AlertTriangle, TrendingDown, ArrowRightLeft, Building2 } from 'lucide-react';
 import { useShortageRadar } from '../hooks/useShortageRadar';
 import { useCountry } from '../context/CountryContext';
 import { MapPanel } from '../components/MapPanel';
+import { ReportExportButton } from '../components/ReportExportButton';
+import { generateReportHTML, downloadReport } from '../lib/reportGenerator';
+import { supabase } from '../supabase';
 import type { RiskLevel } from '../types';
 
 function RiskBadge({ level }: { level: RiskLevel | string }) {
@@ -36,6 +39,7 @@ function KpiCard({ label, value, icon: Icon, tone }: { label: string; value: num
 export function ShortageRadarPage() {
   const { data, facilities, loading, error } = useShortageRadar();
   const { country } = useCountry();
+  const [isExporting, setIsExporting] = useState(false);
 
   const kpis = useMemo(() => {
     const criticalMedicines = new Set<string>();
@@ -67,21 +71,11 @@ export function ShortageRadarPage() {
     const rank: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
     for (const row of data) {
       if (!map.has(row.medicine_id)) {
-        map.set(row.medicine_id, {
-          name: row.medicine_name,
-          category: row.medicine_category,
-          facilities: new Set(),
-          earliest: null,
-          worst: 'Low',
-        });
+        map.set(row.medicine_id, { name: row.medicine_name, category: row.medicine_category, facilities: new Set(), earliest: null, worst: 'Low' });
       }
       const e = map.get(row.medicine_id)!;
-      if (row.risk_level === 'Critical' || row.risk_level === 'High') {
-        e.facilities.add(row.facility_id);
-      }
-      if (row.projected_stockout_date && (!e.earliest || row.projected_stockout_date < e.earliest)) {
-        e.earliest = row.projected_stockout_date;
-      }
+      if (row.risk_level === 'Critical' || row.risk_level === 'High') e.facilities.add(row.facility_id);
+      if (row.projected_stockout_date && (!e.earliest || row.projected_stockout_date < e.earliest)) e.earliest = row.projected_stockout_date;
       if ((rank[row.risk_level] ?? 0) > (rank[e.worst] ?? 0)) e.worst = row.risk_level;
     }
     return Array.from(map.values())
@@ -123,6 +117,64 @@ export function ShortageRadarPage() {
       .slice(0, 10);
   }, [data]);
 
+  async function handleExport() {
+    setIsExporting(true);
+    try {
+      let summary = '';
+      let summaryError: string | undefined;
+
+      // Fetch AI summary
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-report-summary`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ country }),
+            signal: controller.signal,
+          }
+        );
+        clearTimeout(timeoutId);
+        if (resp.ok) {
+          const json = await resp.json();
+          summary = json.summary || '';
+          if (!summary) summaryError = 'Summary returned empty.';
+        } else {
+          summaryError = `Summary service returned HTTP ${resp.status}.`;
+        }
+      } catch (err) {
+        summaryError = err instanceof Error && err.name === 'AbortError'
+          ? 'Summary generation timed out.'
+          : 'Summary generation failed.';
+      }
+
+      // Fetch supply context
+      let supplyContext: any = null;
+      try {
+        const { data: ctx } = await supabase.rpc('get_supply_context', { country_filter: country });
+        supplyContext = ctx;
+      } catch {}
+
+      const html = generateReportHTML({
+        country,
+        radarData: data,
+        facilities,
+        supplyContext,
+        summary,
+        summaryError,
+      });
+
+      downloadReport(html, country);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Export failed. See console for details.');
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-baseline justify-between">
@@ -133,6 +185,7 @@ export function ShortageRadarPage() {
             {loading && ' · loading...'}
           </p>
         </div>
+        <ReportExportButton onClick={handleExport} isGenerating={isExporting} />
       </div>
 
       {error && (
