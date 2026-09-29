@@ -23,7 +23,7 @@ function App() {
       <BrowserRouter>
         <Layout>
           <Routes>
-            <Route path="/" element={<Navigate to="/shortage-radar" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/shortage-radar" element={<ShortageRadarPage />} />
             <Route path="/medicines" element={<MedicinesPage />} />
@@ -47,3 +47,4 @@ function App() {
 }
 
 export default App;
+
