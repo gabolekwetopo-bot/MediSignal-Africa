@@ -177,7 +177,7 @@ export function DashboardPage() {
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
             <h2 className="font-semibold text-slate-900 text-sm">Top Medicines at Risk</h2>
-            <Link to="/medicines" className="text-xs text-cyan-600 hover:text-cyan-700 flex items-center gap-1">
+            <Link to="/medicines?risk=Critical" className="text-xs text-cyan-600 hover:text-cyan-700 flex items-center gap-1">
               View all <ChevronRight size={12} />
             </Link>
           </div>
@@ -204,7 +204,7 @@ export function DashboardPage() {
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
             <h2 className="font-semibold text-slate-900 text-sm">Facilities with Most Critical Stockouts</h2>
-            <Link to="/facilities" className="text-xs text-cyan-600 hover:text-cyan-700 flex items-center gap-1">
+            <Link to="/facilities?risk=Critical" className="text-xs text-cyan-600 hover:text-cyan-700 flex items-center gap-1">
               View all <ChevronRight size={12} />
             </Link>
           </div>
@@ -276,5 +276,6 @@ export function DashboardPage() {
     </div>
   );
 }
+
 
 

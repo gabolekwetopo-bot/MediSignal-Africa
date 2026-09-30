@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, ChevronRight, ChevronDown, MapPin } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useCountry } from '../context/CountryContext';
 
@@ -13,8 +14,14 @@ interface MedicineRow {
 
 interface RadarRow {
   medicine_id: string;
-  risk_level: string;
   facility_id: string;
+  facility_name: string;
+  district: string;
+  region: string;
+  risk_level: string;
+  days_of_stock: number | null;
+  projected_stockout_date: string | null;
+  current_stock: number;
 }
 
 function RiskBadge({ level }: { level: string }) {
@@ -34,12 +41,14 @@ function RiskBadge({ level }: { level: string }) {
 
 export function MedicinesPage() {
   const { country } = useCountry();
+  const [searchParams] = useSearchParams();
   const [medicines, setMedicines] = useState<MedicineRow[]>([]);
   const [radar, setRadar] = useState<RadarRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [riskFilter, setRiskFilter] = useState('');
+  const [riskFilter, setRiskFilter] = useState(searchParams.get('risk') ?? '');
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,14 +71,21 @@ export function MedicinesPage() {
     const rank: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
     return medicines.map(m => {
       const rows = radar.filter(r => r.medicine_id === m.id);
-      const facilitiesAtRisk = new Set(
-        rows.filter(r => r.risk_level === 'Critical' || r.risk_level === 'High').map(r => r.facility_id)
-      );
+      const atRiskRows = rows.filter(r => r.risk_level === 'Critical' || r.risk_level === 'High');
       let worst = 'Low';
       for (const r of rows) {
         if ((rank[r.risk_level] ?? 0) > (rank[worst] ?? 0)) worst = r.risk_level;
       }
-      return { ...m, facilitiesAtRisk: facilitiesAtRisk.size, worstRisk: worst };
+      return {
+        ...m,
+        facilitiesAtRisk: atRiskRows.length,
+        worstRisk: worst,
+        affectedRows: atRiskRows.sort((a, b) => {
+          const diff = (rank[b.risk_level] ?? 0) - (rank[a.risk_level] ?? 0);
+          if (diff !== 0) return diff;
+          return (a.days_of_stock ?? 999) - (b.days_of_stock ?? 999);
+        }),
+      };
     });
   }, [medicines, radar]);
 
@@ -137,6 +153,7 @@ export function MedicinesPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
             <tr>
+              <th className="text-left px-4 py-3 font-semibold w-8"></th>
               <th className="text-left px-4 py-3 font-semibold">Medicine</th>
               <th className="text-left px-4 py-3 font-semibold">Category</th>
               <th className="text-left px-4 py-3 font-semibold">Unit</th>
@@ -146,23 +163,65 @@ export function MedicinesPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(m => (
-              <tr key={m.id} className="border-t border-slate-100 hover:bg-slate-50/50">
-                <td className="px-4 py-2 font-medium text-slate-800">{m.name}</td>
-                <td className="px-4 py-2 text-slate-500">{m.category}</td>
-                <td className="px-4 py-2 text-slate-500 text-xs">{m.unit}</td>
-                <td className="px-4 py-2 text-right tabular-nums font-semibold text-slate-700">
-                  {m.facilitiesAtRisk || '—'}
-                </td>
-                <td className="px-4 py-2 text-right tabular-nums text-slate-500">{m.min_reorder_level}</td>
-                <td className="px-4 py-2"><RiskBadge level={m.worstRisk} /></td>
-              </tr>
-            ))}
+            {filtered.map(m => {
+              const isOpen = expanded === m.id;
+              const hasAffected = m.affectedRows.length > 0;
+              return (
+                <>
+                  <tr
+                    key={m.id}
+                    className={`border-t border-slate-100 ${hasAffected ? 'cursor-pointer hover:bg-slate-50/70' : ''}`}
+                    onClick={() => hasAffected && setExpanded(isOpen ? null : m.id)}
+                  >
+                    <td className="px-4 py-2 text-slate-400">
+                      {hasAffected && (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+                    </td>
+                    <td className="px-4 py-2 font-medium text-slate-800">{m.name}</td>
+                    <td className="px-4 py-2 text-slate-500">{m.category}</td>
+                    <td className="px-4 py-2 text-slate-500 text-xs">{m.unit}</td>
+                    <td className="px-4 py-2 text-right tabular-nums font-semibold">
+                      {hasAffected ? (
+                        <span className="text-cyan-700 underline decoration-dotted underline-offset-2">
+                          {m.facilitiesAtRisk}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums text-slate-500">{m.min_reorder_level}</td>
+                    <td className="px-4 py-2"><RiskBadge level={m.worstRisk} /></td>
+                  </tr>
+                  {isOpen && (
+                    <tr key={`${m.id}-expanded`} className="bg-slate-50/60">
+                      <td colSpan={7} className="px-4 py-3 border-t border-slate-200">
+                        <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-2 flex items-center gap-1">
+                          <MapPin size={11} /> Facilities at risk ({m.affectedRows.length})
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {m.affectedRows.map(r => (
+                            <div key={r.facility_id} className="bg-white border border-slate-200 rounded px-3 py-2 flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-medium text-slate-800 truncate">{r.facility_name}</div>
+                                <div className="text-[10px] text-slate-500">{r.district}{r.region ? ` · ${r.region}` : ''}</div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {r.days_of_stock != null ? `${r.days_of_stock.toFixed(1)} days of stock` : 'No stock data'}
+                                </div>
+                              </div>
+                              <RiskBadge level={r.risk_level} />
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
             {filtered.length === 0 && !loading && (
-              <tr><td colSpan={6} className="text-center text-slate-400 py-8 text-sm">No medicines match your filters</td></tr>
+              <tr><td colSpan={7} className="text-center text-slate-400 py-8 text-sm">No medicines match your filters</td></tr>
             )}
             {loading && (
-              <tr><td colSpan={6} className="text-center text-slate-400 py-8 text-sm">Loading...</td></tr>
+              <tr><td colSpan={7} className="text-center text-slate-400 py-8 text-sm">Loading...</td></tr>
             )}
           </tbody>
         </table>
