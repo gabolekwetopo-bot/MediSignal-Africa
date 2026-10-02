@@ -48,7 +48,7 @@ interface MapPanelProps {
   loading?: boolean;
 }
 
-export function MapPanel({ radarData, facilities, country, loading }: MapPanelProps) {
+export function MapPanel({ radarData, facilities, country }: MapPanelProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -213,3 +213,4 @@ export function MapPanel({ radarData, facilities, country, loading }: MapPanelPr
     </div>
   );
 }
+

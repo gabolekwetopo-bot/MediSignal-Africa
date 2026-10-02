@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+﻿import { createContext, useContext, useState, type ReactNode } from 'react';
 
 export type Country = 'Botswana' | 'Ghana' | 'Kenya' | 'Nigeria' | null;
 
@@ -43,4 +43,5 @@ export function CountryProvider({ children }: { children: ReactNode }) {
 export function useCountry() {
   return useContext(CountryContext);
 }
+
 

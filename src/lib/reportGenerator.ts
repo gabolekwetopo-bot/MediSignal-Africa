@@ -1,4 +1,4 @@
-﻿import type { ShortageRadarRow, Facility, RiskLevel } from '../types';
+﻿import type { ShortageRadarRow, Facility } from '../types';
 
 interface ExportParams {
   country: string | null;
@@ -316,3 +316,4 @@ export function downloadReport(html: string, country: string | null): void {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+

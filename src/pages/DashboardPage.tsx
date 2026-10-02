@@ -2,7 +2,7 @@
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle, Building2, TrendingDown, ArrowRightLeft,
-  Pill, Package, ShoppingCart, Sparkles, ChevronRight,
+  Pill, ShoppingCart, Sparkles, ChevronRight,
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useCountry } from '../context/CountryContext';
@@ -276,6 +276,7 @@ export function DashboardPage() {
     </div>
   );
 }
+
 
 
 

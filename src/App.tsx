@@ -1,5 +1,6 @@
 ﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { CountryProvider } from './context/CountryContext';
+import { RoleProvider } from './context/RoleContext';
 import { Layout } from './components/Layout';
 import { DashboardPage } from './pages/DashboardPage';
 import { ShortageRadarPage } from './pages/ShortageRadarPage';
@@ -20,6 +21,7 @@ import { SettingsPage } from './pages/SettingsPage';
 function App() {
   return (
     <CountryProvider>
+      <RoleProvider>
       <BrowserRouter>
         <Layout>
           <Routes>
@@ -42,9 +44,11 @@ function App() {
           </Routes>
         </Layout>
       </BrowserRouter>
+    </RoleProvider>
     </CountryProvider>
   );
 }
 
 export default App;
+
 

@@ -17,6 +17,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { useCountry, type Country } from '../context/CountryContext';
+import { useRole, ROLES, type RoleKey } from '../context/RoleContext';
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -55,6 +56,22 @@ function CountrySelector() {
       <option value="Ghana">Ghana</option>
       <option value="Kenya">Kenya</option>
       <option value="Nigeria">Nigeria</option>
+    </select>
+  );
+}
+
+function RoleSelector() {
+  const { role, setRole } = useRole();
+  return (
+    <select
+      value={role}
+      onChange={(e) => setRole(e.target.value as RoleKey)}
+      className="bg-white border border-slate-300 text-slate-700 text-sm rounded-md px-3 py-1.5 focus:outline-none focus:border-cyan-500"
+      title="Simulated role — in production this comes from the authenticated session"
+    >
+      {ROLES.map(r => (
+        <option key={r.key} value={r.key}>Acting as: {r.label}</option>
+      ))}
     </select>
   );
 }
@@ -105,6 +122,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0">
           <div className="flex items-center gap-3">
             <CountrySelector />
+            <RoleSelector />
           </div>
           <div className="flex items-center gap-4">
             <span className="text-[10px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 px-2 py-1 rounded">
@@ -117,8 +135,14 @@ export function Layout({ children }: { children: ReactNode }) {
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
+        <footer className="h-10 bg-white border-t border-slate-200 flex items-center justify-between px-6 text-[11px] text-slate-500 flex-shrink-0">
+          <div>Medisignal Africa · Demonstration Data</div>
+          <div>Developed by <strong className="text-slate-700">Gabolekwe Topo Gabolekwe</strong></div>
+        </footer>
       </div>
     </div>
   );
 }
+
+
 
