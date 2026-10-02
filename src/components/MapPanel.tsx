@@ -200,7 +200,7 @@ export function MapPanel({ radarData, facilities, country }: MapPanelProps) {
 
         <style>{`
           .leaflet-container { background: #050b18 !important; }
-          .leaflet-tile-pane { filter: hue-rotate(180deg) saturate(1.4) brightness(0.7) contrast(1.2); }
+          .leaflet-tile-pane { filter: hue-rotate(190deg) saturate(1.3) brightness(0.75) contrast(1.15); }
           .marker-critical {
             animation: pulse-critical 1.6s ease-in-out infinite;
           }
@@ -213,4 +213,9 @@ export function MapPanel({ radarData, facilities, country }: MapPanelProps) {
     </div>
   );
 }
+
+
+
+
+
 
