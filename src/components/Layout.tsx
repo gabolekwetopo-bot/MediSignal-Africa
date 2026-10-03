@@ -1,6 +1,7 @@
 ﻿import { type ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import {
+  Home,
   LayoutDashboard,
   Radar,
   Pill,
@@ -20,6 +21,7 @@ import { useCountry, type Country } from '../context/CountryContext';
 import { useRole, ROLES, type RoleKey } from '../context/RoleContext';
 
 const NAV_ITEMS = [
+  { to: '/', label: 'Home', icon: Home },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/shortage-radar', label: 'Shortage Radar', icon: Radar },
   { to: '/medicines', label: 'Medicines', icon: Pill },
@@ -143,6 +145,8 @@ export function Layout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+
 
 
 

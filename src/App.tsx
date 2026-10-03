@@ -1,7 +1,8 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { CountryProvider } from './context/CountryContext';
 import { RoleProvider } from './context/RoleContext';
 import { Layout } from './components/Layout';
+import { HeroPage } from './pages/HeroPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ShortageRadarPage } from './pages/ShortageRadarPage';
 import { MedicinesPage } from './pages/MedicinesPage';
@@ -18,37 +19,46 @@ import { ReportsPage } from './pages/ReportsPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';
 
+const APP_ROUTES = [
+  { path: '/dashboard', element: <DashboardPage /> },
+  { path: '/shortage-radar', element: <ShortageRadarPage /> },
+  { path: '/medicines', element: <MedicinesPage /> },
+  { path: '/facilities', element: <FacilitiesPage /> },
+  { path: '/inventory', element: <InventoryPage /> },
+  { path: '/consumption', element: <ConsumptionPage /> },
+  { path: '/procurement', element: <ProcurementPage /> },
+  { path: '/predictions', element: <PredictionsPage /> },
+  { path: '/redistribution', element: <RedistributionPage /> },
+  { path: '/ai-advisor', element: <AISupplyAdvisorPage /> },
+  { path: '/alerts', element: <AlertsPage /> },
+  { path: '/data-import', element: <DataImportPage /> },
+  { path: '/reports', element: <ReportsPage /> },
+  { path: '/users', element: <UsersPage /> },
+  { path: '/settings', element: <SettingsPage /> },
+];
+
 function App() {
   return (
     <CountryProvider>
       <RoleProvider>
-      <BrowserRouter>
-        <Layout>
+        <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/shortage-radar" element={<ShortageRadarPage />} />
-            <Route path="/medicines" element={<MedicinesPage />} />
-            <Route path="/facilities" element={<FacilitiesPage />} />
-            <Route path="/inventory" element={<InventoryPage />} />
-            <Route path="/consumption" element={<ConsumptionPage />} />
-            <Route path="/procurement" element={<ProcurementPage />} />
-            <Route path="/predictions" element={<PredictionsPage />} />
-            <Route path="/redistribution" element={<RedistributionPage />} />
-            <Route path="/ai-advisor" element={<AISupplyAdvisorPage />} />
-            <Route path="/alerts" element={<AlertsPage />} />
-            <Route path="/data-import" element={<DataImportPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/users" element={<UsersPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            {/* Hero is standalone — no sidebar, no header */}
+            <Route path="/" element={<HeroPage />} />
+
+            {/* All app pages wrapped in the Layout */}
+            {APP_ROUTES.map(r => (
+              <Route
+                key={r.path}
+                path={r.path}
+                element={<Layout>{r.element}</Layout>}
+              />
+            ))}
           </Routes>
-        </Layout>
-      </BrowserRouter>
-    </RoleProvider>
+        </BrowserRouter>
+      </RoleProvider>
     </CountryProvider>
   );
 }
 
 export default App;
-
-

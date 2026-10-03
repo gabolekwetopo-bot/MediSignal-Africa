@@ -167,6 +167,24 @@ export function ShortageRadarPage() {
       });
 
       downloadReport(html, country);
+
+      // Log report generation to localStorage for history
+      try {
+        const entry = {
+          id: `report-${Date.now()}`,
+          generatedAt: new Date().toISOString(),
+          country: country ?? 'All Africa',
+          format: 'HTML → PDF',
+          summaryIncluded: !!summary,
+        };
+        const existing = JSON.parse(localStorage.getItem('medisignal.report-history') || '[]');
+        if (Array.isArray(existing)) {
+          existing.unshift(entry);
+          localStorage.setItem('medisignal.report-history', JSON.stringify(existing.slice(0, 50)));
+        } else {
+          localStorage.setItem('medisignal.report-history', JSON.stringify([entry]));
+        }
+      } catch {}
     } catch (err) {
       console.error('Export failed:', err);
       alert('Export failed. See console for details.');
@@ -302,3 +320,4 @@ export function ShortageRadarPage() {
     </div>
   );
 }
+
