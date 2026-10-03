@@ -1,4 +1,5 @@
 ﻿import type { ShortageRadarRow, Facility } from '../types';
+import { REPORT_HEADER_LOCKUP } from './reportLogo';
 
 interface ExportParams {
   country: string | null;
@@ -132,6 +133,7 @@ export function generateReportHTML(params: ExportParams): string {
       <div style="font-size:8px;margin-top:2px;color:#9ca3af;letter-spacing:0.04em;">
         DEMONSTRATION DATA — SYNTHETIC · NOT OFFICIAL GOVERNMENT RECORDS
       </div>
+      </div>
     </div>`;
 
   const medicineRows = medicinesAtRisk.map(m => `
@@ -220,7 +222,7 @@ export function generateReportHTML(params: ExportParams): string {
 <!-- PAGE 1: COVER -->
 <div class="page" style="display:flex;flex-direction:column;justify-content:space-between;">
   <div>
-    <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#0891b2;font-weight:700;font-family:Helvetica,Arial,sans-serif;">MEDISIGNAL AFRICA</div>
+    ${REPORT_HEADER_LOCKUP}
     <div style="margin-top:70mm;">
       <h1 style="font-size:38px;line-height:1.15;font-weight:700;margin:0;color:#0f172a;">${esc(countryName)} Medicine Supply Situation Report</h1>
       <p style="font-size:16px;color:#475569;margin-top:12px;font-weight:500;font-family:Helvetica,Arial,sans-serif;">National Shortage Radar Analysis</p>
@@ -316,4 +318,8 @@ export function downloadReport(html: string, country: string | null): void {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+
+
+
 

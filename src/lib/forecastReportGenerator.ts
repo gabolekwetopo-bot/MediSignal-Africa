@@ -1,4 +1,6 @@
-﻿interface ForecastRow {
+﻿import { REPORT_HEADER_LOCKUP } from './reportLogo';
+
+interface ForecastRow {
   facility_id: string;
   facility_name: string;
   district: string;
@@ -113,7 +115,7 @@ export function generateForecastHTML(params: ForecastReportParams): string {
 
 <!-- PAGE 1: SUMMARY -->
 <div class="page">
-  <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#0891b2;font-weight:700;font-family:Helvetica,Arial,sans-serif;margin-bottom:6px;">MEDISIGNAL AFRICA</div>
+  ${REPORT_HEADER_LOCKUP}
   <h1 style="font-size:26px;line-height:1.2;font-weight:700;margin:0 0 6px 0;color:#0f172a;">${esc(countryName)} Medicine Stockout Forecast</h1>
   <p style="font-size:14px;color:#475569;margin:0 0 4px 0;font-family:Helvetica,Arial,sans-serif;">${esc(label)} · ${esc(fmt(startDate))} – ${esc(fmt(endDate))}</p>
   <div style="border-bottom:1px solid #06b6d4;margin:14px 0;"></div>
@@ -134,8 +136,7 @@ export function generateForecastHTML(params: ForecastReportParams): string {
     AI-generated forecast narrative based on live supply data. All figures are Demonstration Data.
   </div>
 
-  <div class="footer">
-    <div>Medisignal Africa · ${esc(countryName)} · Demonstration Data · Page 1 of 2</div>
+  <div class="footer"><div>Medisignal Africa · ${esc(countryName)} · Demonstration Data · Page 1 of 2</div>
     <div style="font-size:8px;margin-top:2px;color:#9ca3af;letter-spacing:0.04em;">DEMONSTRATION DATA — SYNTHETIC · NOT OFFICIAL GOVERNMENT RECORDS</div>
   </div>
 </div>
@@ -162,8 +163,7 @@ export function generateForecastHTML(params: ForecastReportParams): string {
     Projected stockout dates are computed from current inventory levels and average daily consumption. All transfers and orders require authorisation by the responsible supply chain officer.
   </div>
 
-  <div class="footer">
-    <div>Medisignal Africa · ${esc(countryName)} · Demonstration Data · Page 2 of 2</div>
+  <div class="footer"><div>Medisignal Africa · ${esc(countryName)} · Demonstration Data · Page 2 of 2</div>
     <div style="font-size:8px;margin-top:2px;color:#9ca3af;letter-spacing:0.04em;">DEMONSTRATION DATA — SYNTHETIC · NOT OFFICIAL GOVERNMENT RECORDS</div>
   </div>
 </div>
@@ -186,3 +186,7 @@ export function downloadForecastReport(html: string, country: string | null, lab
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+
+
+

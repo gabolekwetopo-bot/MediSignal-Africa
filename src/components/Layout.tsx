@@ -85,9 +85,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col flex-shrink-0">
         <div className="h-16 flex items-center px-5 border-b border-slate-800">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">M</span>
-            </div>
+            <img src="/logo.svg" alt="Medisignal" className="w-8 h-8 rounded-lg" />
             <div>
               <div className="text-white font-semibold text-sm leading-tight">Medisignal</div>
               <div className="text-slate-500 text-[10px] uppercase tracking-wider">Africa</div>
@@ -145,6 +143,7 @@ export function Layout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
 
 
 

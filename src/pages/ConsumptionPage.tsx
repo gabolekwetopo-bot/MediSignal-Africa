@@ -1,130 +1,94 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { Search, TrendingUp, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, TrendingUp, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useCountry } from '../context/CountryContext';
 
-interface ConsumptionRow {
-  id: string;
-  facility_id: string;
-  medicine_id: string;
-  quantity: number;
-  period_start: string;
-  period_end: string;
-  recorded_at: string;
+interface AggregateRow {
+  facility_name: string;
+  facility_district: string;
+  facility_country: string;
+  medicine_name: string;
+  medicine_category: string;
+  medicine_unit: string;
+  total_quantity: number;
+  months_reported: number;
+  avg_monthly: number;
 }
 
-interface FacilityLite { id: string; name: string; country: string; district: string; }
-interface MedicineLite { id: string; name: string; category: string; unit: string; }
-
-type SortKey = 'facility' | 'medicine' | 'quantity' | 'period_start' | 'period_end';
+type SortKey = 'facility' | 'medicine' | 'total_quantity' | 'avg_monthly';
 type SortDir = 'asc' | 'desc';
+
+const PAGE_SIZE = 50;
 
 export function ConsumptionPage() {
   const { country } = useCountry();
-  const [consumption, setConsumption] = useState<ConsumptionRow[]>([]);
-  const [facilities, setFacilities] = useState<FacilityLite[]>([]);
-  const [medicines, setMedicines] = useState<MedicineLite[]>([]);
+  const [rows, setRows] = useState<AggregateRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [periodFilter, setPeriodFilter] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('period_start');
+  const [searchDebounced, setSearchDebounced] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('total_quantity');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [summary, setSummary] = useState({ totalPairs: 0, totalUnits: 0, facilities: 0, medicines: 0 });
+
+  useEffect(() => {
+    const t = setTimeout(() => { setSearchDebounced(search); setPage(0); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => { setPage(0); }, [country]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const [facRes, medRes] = await Promise.all([
-        country
-          ? supabase.from('facilities').select('id, name, country, district').eq('country', country)
-          : supabase.from('facilities').select('id, name, country, district'),
-        supabase.from('medicines').select('id, name, category, unit'),
-      ]);
-      const facList = (facRes.data ?? []) as FacilityLite[];
-      const facMap = new Map(facList.map(f => [f.id, f]));
-      const all: ConsumptionRow[] = [];
-      const PAGE = 1000;
-      let from = 0;
-      while (true) {
-        const { data } = await supabase
-          .from('consumption')
-          .select('id, facility_id, medicine_id, quantity, period_start, period_end, recorded_at')
-          .range(from, from + PAGE - 1);
-        if (!data || data.length === 0) break;
-        for (const row of data) {
-          if (facMap.has(row.facility_id)) all.push(row as ConsumptionRow);
-        }
-        if (data.length < PAGE) break;
-        from += PAGE;
-      }
+      const { data, error } = await supabase.rpc('get_consumption_summary_paginated', {
+        country_filter: country ?? null,
+        search_term: searchDebounced || null,
+        sort_key: sortKey,
+        sort_dir: sortDir,
+        page_offset: page * PAGE_SIZE,
+        page_size: PAGE_SIZE,
+      });
+
       if (cancelled) return;
-      setConsumption(all);
-      setFacilities(facList);
-      setMedicines((medRes.data ?? []) as MedicineLite[]);
+      if (error || !data) {
+        setRows([]);
+        setTotalCount(0);
+      } else {
+        const items = (data.items ?? []) as AggregateRow[];
+        setRows(items);
+        setTotalCount(data.total_count ?? 0);
+      }
       setLoading(false);
     }
     load();
     return () => { cancelled = true; };
+  }, [page, country, searchDebounced, sortKey, sortDir]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSummary() {
+      const { data } = await supabase.rpc('get_consumption_summary', {
+        country_filter: country ?? null,
+      });
+      if (cancelled) return;
+      const list = (data ?? []) as AggregateRow[];
+      const totalUnits = list.reduce((s, r) => s + Number(r.total_quantity ?? 0), 0);
+      const facilities = new Set(list.map(r => r.facility_name)).size;
+      const medicines = new Set(list.map(r => r.medicine_name)).size;
+      setSummary({ totalPairs: list.length, totalUnits, facilities, medicines });
+    }
+    loadSummary();
+    return () => { cancelled = true; };
   }, [country]);
-
-  const facilityMap = useMemo(() => new Map(facilities.map(f => [f.id, f])), [facilities]);
-  const medicineMap = useMemo(() => new Map(medicines.map(m => [m.id, m])), [medicines]);
-
-  const enriched = useMemo(() => {
-    return consumption.map(c => {
-      const fac = facilityMap.get(c.facility_id);
-      const med = medicineMap.get(c.medicine_id);
-      return {
-        ...c,
-        facilityName: fac?.name ?? '—',
-        facilityDistrict: fac?.district ?? '—',
-        facilityCountry: fac?.country ?? '—',
-        medicineName: med?.name ?? '—',
-        medicineCategory: med?.category ?? '—',
-        medicineUnit: med?.unit ?? '',
-      };
-    });
-  }, [consumption, facilityMap, medicineMap]);
-
-  const stats = useMemo(() => {
-    const total = enriched.length;
-    const totalQty = enriched.reduce((s, e) => s + (e.quantity ?? 0), 0);
-    const periods = new Set(enriched.map(e => e.period_start));
-    return { total, totalQty, periods: periods.size };
-  }, [enriched]);
-
-  const periods = useMemo(() => {
-    const set = new Set(enriched.map(e => e.period_start));
-    return Array.from(set).sort().reverse();
-  }, [enriched]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(key); setSortDir('asc'); }
+    else { setSortKey(key); setSortDir('desc'); }
+    setPage(0);
   }
-
-  const filtered = useMemo(() => {
-    const list = enriched.filter(c => {
-      if (periodFilter && c.period_start !== periodFilter) return false;
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return c.facilityName.toLowerCase().includes(q) ||
-             c.medicineName.toLowerCase().includes(q) ||
-             c.facilityDistrict.toLowerCase().includes(q);
-    });
-    const dir = sortDir === 'asc' ? 1 : -1;
-    return list.sort((a, b) => {
-      let cmp = 0;
-      switch (sortKey) {
-        case 'facility': cmp = a.facilityName.localeCompare(b.facilityName); break;
-        case 'medicine': cmp = a.medicineName.localeCompare(b.medicineName); break;
-        case 'quantity': cmp = a.quantity - b.quantity; break;
-        case 'period_start': cmp = (a.period_start ?? '').localeCompare(b.period_start ?? ''); break;
-        case 'period_end': cmp = (a.period_end ?? '').localeCompare(b.period_end ?? ''); break;
-      }
-      return cmp * dir;
-    });
-  }, [enriched, search, periodFilter, sortKey, sortDir]);
 
   function SortHeader({ label, k, align = 'left' }: { label: string; k: SortKey; align?: 'left' | 'right' }) {
     const active = sortKey === k;
@@ -141,41 +105,50 @@ export function ConsumptionPage() {
     );
   }
 
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Consumption</h1>
         <p className="text-slate-500 text-sm mt-1">
-          Historical medicine consumption {country ? `· ${country}` : '· All Africa'}
+          Aggregated consumption per facility-medicine pair {country ? `· ${country}` : '· All Africa'}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Records</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Facility-Meds Tracked</span>
             <TrendingUp size={16} className="text-cyan-500" />
           </div>
-          <div className="mt-2 text-3xl font-bold text-slate-900 tabular-nums">{stats.total.toLocaleString()}</div>
+          <div className="mt-2 text-3xl font-bold text-slate-900 tabular-nums">{summary.totalPairs.toLocaleString()}</div>
         </div>
         <div className="bg-white border border-slate-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Units Consumed</span>
             <TrendingUp size={16} className="text-green-500" />
           </div>
-          <div className="mt-2 text-3xl font-bold text-green-600 tabular-nums">{stats.totalQty.toLocaleString()}</div>
+          <div className="mt-2 text-3xl font-bold text-green-600 tabular-nums">{summary.totalUnits.toLocaleString()}</div>
         </div>
         <div className="bg-white border border-slate-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Reporting Periods</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Facilities</span>
             <TrendingUp size={16} className="text-indigo-500" />
           </div>
-          <div className="mt-2 text-3xl font-bold text-indigo-600 tabular-nums">{stats.periods}</div>
+          <div className="mt-2 text-3xl font-bold text-indigo-600 tabular-nums">{summary.facilities}</div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Medicines</span>
+            <TrendingUp size={16} className="text-amber-500" />
+          </div>
+          <div className="mt-2 text-3xl font-bold text-amber-600 tabular-nums">{summary.medicines}</div>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-col sm:flex-row gap-3">
-        <div className="flex-1 relative">
+      <div className="bg-white border border-slate-200 rounded-lg p-4">
+        <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -185,14 +158,6 @@ export function ConsumptionPage() {
             className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:border-cyan-500"
           />
         </div>
-        <select
-          value={periodFilter}
-          onChange={(e) => setPeriodFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:border-cyan-500"
-        >
-          <option value="">All periods</option>
-          {periods.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
@@ -202,42 +167,69 @@ export function ConsumptionPage() {
               <tr>
                 <SortHeader label="Facility" k="facility" />
                 <SortHeader label="Medicine" k="medicine" />
-                <SortHeader label="Quantity" k="quantity" align="right" />
-                <SortHeader label="Period Start" k="period_start" />
-                <SortHeader label="Period End" k="period_end" />
+                <SortHeader label="Total Consumed" k="total_quantity" align="right" />
+                <SortHeader label="Avg / Month" k="avg_monthly" align="right" />
+                <th className="text-right px-4 py-3 font-semibold">Months Reported</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.slice(0, 500).map(c => (
-                <tr key={c.id} className="border-t border-slate-100 hover:bg-slate-50/50">
+              {rows.map((r, i) => (
+                <tr key={i} className="border-t border-slate-100 hover:bg-slate-50/50">
                   <td className="px-4 py-2">
-                    <div className="font-medium text-slate-800">{c.facilityName}</div>
-                    <div className="text-[11px] text-slate-400">{c.facilityDistrict} · {c.facilityCountry}</div>
+                    <div className="font-medium text-slate-800">{r.facility_name}</div>
+                    <div className="text-[11px] text-slate-400">{r.facility_district} · {r.facility_country}</div>
                   </td>
                   <td className="px-4 py-2">
-                    <div className="text-slate-700">{c.medicineName}</div>
-                    <div className="text-[11px] text-slate-400">{c.medicineCategory}</div>
+                    <div className="text-slate-700">{r.medicine_name}</div>
+                    <div className="text-[11px] text-slate-400">{r.medicine_category}</div>
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums text-slate-700">
-                    {c.quantity}
-                    <span className="text-[10px] text-slate-400 ml-1">{c.medicineUnit}</span>
+                    {Number(r.total_quantity).toLocaleString()}
+                    <span className="text-[10px] text-slate-400 ml-1">{r.medicine_unit}</span>
                   </td>
-                  <td className="px-4 py-2 text-slate-500 text-xs tabular-nums">{c.period_start}</td>
-                  <td className="px-4 py-2 text-slate-500 text-xs tabular-nums">{c.period_end}</td>
+                  <td className="px-4 py-2 text-right tabular-nums font-semibold text-cyan-700">
+                    {Math.round(Number(r.avg_monthly))}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums text-slate-500">
+                    {r.months_reported}
+                  </td>
                 </tr>
               ))}
-              {filtered.length === 0 && !loading && (
-                <tr><td colSpan={5} className="text-center text-slate-400 py-8 text-sm">No consumption records match your filters</td></tr>
+              {rows.length === 0 && !loading && (
+                <tr><td colSpan={5} className="text-center text-slate-400 py-8 text-sm">No consumption data matches your filters</td></tr>
               )}
               {loading && (
-                <tr><td colSpan={5} className="text-center text-slate-400 py-8 text-sm">Loading...</td></tr>
+                <tr>
+                  <td colSpan={5} className="text-center py-8">
+                    <Loader2 size={20} className="animate-spin text-cyan-500 inline" />
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-        {filtered.length > 500 && (
-          <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-xs text-slate-500">
-            Showing first 500 of {filtered.length.toLocaleString()} records. Use search or period filter to narrow.
+
+        {totalPages > 1 && (
+          <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between bg-slate-50">
+            <div className="text-xs text-slate-500">
+              Page {page + 1} of {totalPages} · {totalCount.toLocaleString()} aggregates
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs border border-slate-300 rounded-md bg-white hover:border-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={12} /> Prev
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs border border-slate-300 rounded-md bg-white hover:border-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next <ChevronRight size={12} />
+              </button>
+            </div>
           </div>
         )}
       </div>

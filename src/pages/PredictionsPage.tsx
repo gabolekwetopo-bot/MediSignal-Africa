@@ -3,6 +3,7 @@ import { TrendingDown, Calendar, AlertTriangle, ChevronDown, ChevronRight, Build
 import { supabase } from '../supabase';
 import { useCountry } from '../context/CountryContext';
 import { generateForecastHTML, downloadForecastReport } from '../lib/forecastReportGenerator';
+import { addReportHistory } from '../lib/reportHistory';
 
 interface RadarRow {
   facility_id: string;
@@ -172,6 +173,18 @@ export function PredictionsPage() {
     });
 
     downloadForecastReport(html, country, bucket.label);
+    addReportHistory({
+      kind: 'forecast',
+      label: `Forecast · ${bucket.label}`,
+      country: country ?? 'All Africa',
+      window: bucket.label,
+      format: 'HTML → PDF',
+      summaryIncluded: !!narrative,
+      payload: {
+        windowStart: bucket.startDate.toISOString(),
+        windowEnd: bucket.endDate.toISOString(),
+      },
+    });
     setGeneratingWeek(null);
   }
 
@@ -353,3 +366,7 @@ export function PredictionsPage() {
     </div>
   );
 }
+
+
+
+

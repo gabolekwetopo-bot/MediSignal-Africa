@@ -5,6 +5,7 @@ import { useCountry } from '../context/CountryContext';
 import { MapPanel } from '../components/MapPanel';
 import { ReportExportButton } from '../components/ReportExportButton';
 import { generateReportHTML, downloadReport } from '../lib/reportGenerator';
+import { addReportHistory } from '../lib/reportHistory';
 import { supabase } from '../supabase';
 import type { RiskLevel } from '../types';
 
@@ -168,23 +169,15 @@ export function ShortageRadarPage() {
 
       downloadReport(html, country);
 
-      // Log report generation to localStorage for history
-      try {
-        const entry = {
-          id: `report-${Date.now()}`,
-          generatedAt: new Date().toISOString(),
-          country: country ?? 'All Africa',
-          format: 'HTML → PDF',
-          summaryIncluded: !!summary,
-        };
-        const existing = JSON.parse(localStorage.getItem('medisignal.report-history') || '[]');
-        if (Array.isArray(existing)) {
-          existing.unshift(entry);
-          localStorage.setItem('medisignal.report-history', JSON.stringify(existing.slice(0, 50)));
-        } else {
-          localStorage.setItem('medisignal.report-history', JSON.stringify([entry]));
-        }
-      } catch {}
+      // Log report generation to history
+      addReportHistory({
+        kind: 'situation',
+        label: 'Situation Report',
+        country: country ?? 'All Africa',
+        format: 'HTML → PDF',
+        summaryIncluded: !!summary,
+        payload: {},
+      });
     } catch (err) {
       console.error('Export failed:', err);
       alert('Export failed. See console for details.');
@@ -320,4 +313,6 @@ export function ShortageRadarPage() {
     </div>
   );
 }
+
+
 

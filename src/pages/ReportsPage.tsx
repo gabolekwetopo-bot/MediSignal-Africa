@@ -1,7 +1,9 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { FileText, Upload, Download, CheckCircle2 } from 'lucide-react';
+import { FileText, Upload, Download, CheckCircle2, Printer, TrendingDown, Sparkles, Trash2, RefreshCw, Loader2 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useCountry } from '../context/CountryContext';
+import { getReportHistory, clearReportHistory, type ReportHistoryEntry, type ReportKind } from '../lib/reportHistory';
+import { regenerateReport } from '../lib/regenerateReport';
 
 interface ImportRow {
   id: string;
@@ -17,24 +19,30 @@ interface ImportRow {
 
 type Tab = 'reports' | 'imports';
 
-interface ReportRecord {
-  id: string;
-  generatedAt: string;
-  country: string;
-  format: string;
-  summaryIncluded: boolean;
-}
+const KIND_META: Record<ReportKind, { label: string; icon: any; color: string }> = {
+  situation: { label: 'Situation Report', icon: FileText, color: 'text-cyan-600 bg-cyan-50 border-cyan-200' },
+  forecast: { label: 'Forecast', icon: TrendingDown, color: 'text-orange-600 bg-orange-50 border-orange-200' },
+  advisory: { label: 'Advisory Briefing', icon: Sparkles, color: 'text-purple-600 bg-purple-50 border-purple-200' },
+};
 
 export function ReportsPage() {
   const { country } = useCountry();
   const [tab, setTab] = useState<Tab>('reports');
   const [imports, setImports] = useState<ImportRow[]>([]);
-  const [, setLoading] = useState(true);
-  const [reports, setReports] = useState<ReportRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [reports, setReports] = useState<ReportHistoryEntry[]>([]);
+  const [kindFilter, setKindFilter] = useState<ReportKind | ''>('');
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [regenMessage, setRegenMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+
+    function loadReports() {
+      setReports(getReportHistory());
+    }
+
+    async function loadImports() {
       setLoading(true);
       const { data } = await supabase
         .from('data_imports')
@@ -43,31 +51,55 @@ export function ReportsPage() {
         .limit(50);
       if (cancelled) return;
       setImports((data ?? []) as ImportRow[]);
-
-      // Reports history is stored in localStorage since each export is client-side
-      try {
-        const stored = localStorage.getItem('medisignal.report-history');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) setReports(parsed);
-        }
-      } catch {}
       setLoading(false);
     }
-    load();
-    return () => { cancelled = true; };
+
+    loadReports();
+    loadImports();
+
+    const handler = () => loadReports();
+    window.addEventListener('medisignal-report-added', handler);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('medisignal-report-added', handler);
+    };
   }, [country]);
+
+  const filteredReports = useMemo(() => {
+    if (!kindFilter) return reports;
+    return reports.filter(r => r.kind === kindFilter);
+  }, [reports, kindFilter]);
 
   const stats = useMemo(() => {
     const totalImports = imports.length;
     const totalRows = imports.reduce((s, i) => s + (i.row_count ?? 0), 0);
     const totalReports = reports.length;
-    return { totalImports, totalRows, totalReports };
+    const byKind = {
+      situation: reports.filter(r => r.kind === 'situation').length,
+      forecast: reports.filter(r => r.kind === 'forecast').length,
+      advisory: reports.filter(r => r.kind === 'advisory').length,
+    };
+    return { totalImports, totalRows, totalReports, byKind };
   }, [imports, reports]);
 
-  function clearReportHistory() {
-    if (!confirm('Clear report generation history from this browser?')) return;
-    localStorage.removeItem('medisignal.report-history');
+  async function handleRegenerate(entry: ReportHistoryEntry) {
+    setRegeneratingId(entry.id);
+    setRegenMessage(null);
+    const result = await regenerateReport(entry);
+    setRegeneratingId(null);
+    if (result.ok) {
+      setRegenMessage('Report regenerated and downloaded.');
+      setTimeout(() => setRegenMessage(null), 4000);
+    } else {
+      setRegenMessage(result.error ?? 'Regeneration failed.');
+      setTimeout(() => setRegenMessage(null), 6000);
+    }
+  }
+
+  function handleClear() {
+    if (!confirm('Clear all report generation history from this browser?')) return;
+    clearReportHistory();
     setReports([]);
   }
 
@@ -79,11 +111,11 @@ export function ReportsPage() {
           Reports
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          History of generated situation reports and staged data imports
+          History of generated reports and staged data imports
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Reports Generated</span>
@@ -108,6 +140,26 @@ export function ReportsPage() {
           <div className="mt-2 text-3xl font-bold text-green-600 tabular-nums">{stats.totalRows.toLocaleString()}</div>
           <div className="text-[11px] text-slate-400 mt-1">across all uploads</div>
         </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">By Type</span>
+            <Printer size={16} className="text-purple-500" />
+          </div>
+          <div className="mt-2 flex gap-3 text-xs">
+            <div>
+              <div className="font-bold text-cyan-600 tabular-nums">{stats.byKind.situation}</div>
+              <div className="text-[9px] text-slate-400 uppercase">Situation</div>
+            </div>
+            <div>
+              <div className="font-bold text-orange-600 tabular-nums">{stats.byKind.forecast}</div>
+              <div className="text-[9px] text-slate-400 uppercase">Forecast</div>
+            </div>
+            <div>
+              <div className="font-bold text-purple-600 tabular-nums">{stats.byKind.advisory}</div>
+              <div className="text-[9px] text-slate-400 uppercase">Advisory</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-2 border-b border-slate-200">
@@ -117,7 +169,7 @@ export function ReportsPage() {
             tab === 'reports' ? 'border-cyan-500 text-cyan-700' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          Situation Reports ({reports.length})
+          Generated Reports ({reports.length})
         </button>
         <button
           onClick={() => setTab('imports')}
@@ -130,59 +182,109 @@ export function ReportsPage() {
       </div>
 
       {tab === 'reports' && (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          {reports.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText size={28} className="mx-auto text-slate-300 mb-2" />
-              <div className="text-sm text-slate-500">No reports generated yet</div>
-              <div className="text-xs text-slate-400 mt-1">
-                Generate a situation report from the Shortage Radar page.
-              </div>
+        <>
+          <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-center gap-3">
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Filter</span>
+            <select
+              value={kindFilter}
+              onChange={(e) => setKindFilter(e.target.value as ReportKind | '')}
+              className="px-3 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:border-cyan-500"
+            >
+              <option value="">All report types</option>
+              <option value="situation">Situation Reports</option>
+              <option value="forecast">Forecasts</option>
+              <option value="advisory">Advisory Briefings</option>
+            </select>
+            <div className="ml-auto text-xs text-slate-500">
+              {filteredReports.length} of {reports.length} reports
             </div>
-          ) : (
-            <>
-              <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-                <div className="text-xs text-slate-500">Report history is stored locally in this browser.</div>
-                <button
-                  onClick={clearReportHistory}
-                  className="text-[11px] text-red-600 hover:text-red-800 font-medium"
-                >
-                  Clear history
-                </button>
+            {reports.length > 0 && (
+              <button
+                onClick={handleClear}
+                className="inline-flex items-center gap-1 text-[11px] text-red-600 hover:text-red-800 font-medium"
+              >
+                <Trash2 size={11} />
+                Clear history
+              </button>
+            )}
+          </div>
+
+          {regenMessage && (
+            <div className="bg-cyan-50 border border-cyan-200 text-cyan-800 text-sm p-3 rounded-lg">
+              {regenMessage}
+            </div>
+          )}
+
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            {filteredReports.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText size={28} className="mx-auto text-slate-300 mb-2" />
+                <div className="text-sm text-slate-500">
+                  {reports.length === 0 ? 'No reports generated yet' : 'No reports match this filter'}
+                </div>
+                <div className="text-xs text-slate-400 mt-1">
+                  Generate a report from the Shortage Radar, Predictions, or AI Advisor pages.
+                </div>
               </div>
+            ) : (
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
                   <tr>
-                    <th className="text-left px-5 py-3 font-semibold">Generated</th>
+                    <th className="text-left px-5 py-3 font-semibold">Type</th>
                     <th className="text-left px-5 py-3 font-semibold">Country</th>
+                    <th className="text-left px-5 py-3 font-semibold">Window</th>
                     <th className="text-left px-5 py-3 font-semibold">Format</th>
-                    <th className="text-left px-5 py-3 font-semibold">AI Summary</th>
+                    <th className="text-left px-5 py-3 font-semibold">AI Content</th>
+                    <th className="text-left px-5 py-3 font-semibold">Generated</th>
+                    <th className="text-right px-5 py-3 font-semibold">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {reports.map(r => (
-                    <tr key={r.id} className="border-t border-slate-100">
-                      <td className="px-5 py-2.5 text-slate-700 tabular-nums text-xs">
-                        {new Date(r.generatedAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}
-                      </td>
-                      <td className="px-5 py-2.5 font-medium text-slate-800">{r.country}</td>
-                      <td className="px-5 py-2.5 text-slate-500 text-xs">{r.format}</td>
-                      <td className="px-5 py-2.5">
-                        {r.summaryIncluded ? (
-                          <span className="inline-flex items-center gap-1 text-green-600 text-xs font-medium">
-                            <CheckCircle2 size={12} /> Included
+                  {filteredReports.map(r => {
+                    const meta = KIND_META[r.kind];
+                    const Icon = meta.icon;
+                    return (
+                      <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/50">
+                        <td className="px-5 py-2.5">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-semibold border rounded uppercase ${meta.color}`}>
+                            <Icon size={10} />
+                            {meta.label}
                           </span>
-                        ) : (
-                          <span className="text-slate-400 text-xs">Not available</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-5 py-2.5 font-medium text-slate-800">{r.country}</td>
+                        <td className="px-5 py-2.5 text-slate-500 text-xs">{r.window ?? '—'}</td>
+                        <td className="px-5 py-2.5 text-slate-500 text-xs">{r.format}</td>
+                        <td className="px-5 py-2.5">
+                          {r.summaryIncluded ? (
+                            <span className="inline-flex items-center gap-1 text-green-600 text-xs font-medium">
+                              <CheckCircle2 size={12} /> Included
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs">Not available</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-2.5 text-slate-500 text-xs tabular-nums">
+                          {new Date(r.generatedAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}
+                        </td>
+                        <td className="px-5 py-2.5 text-right">
+                          <button
+                            onClick={() => handleRegenerate(r)}
+                            disabled={regeneratingId === r.id}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-600 hover:text-cyan-800 disabled:text-slate-400 px-2 py-1 rounded hover:bg-cyan-50 disabled:hover:bg-transparent transition"
+                            title="Regenerate and re-download this report"
+                          >
+                            {regeneratingId === r.id ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                            {regeneratingId === r.id ? 'Regenerating…' : 'Re-download'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       )}
 
       {tab === 'imports' && (
@@ -238,10 +340,11 @@ export function ReportsPage() {
       )}
 
       <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-xs text-slate-600 leading-relaxed">
-        <strong className="text-slate-800">About this page:</strong> Medisignal produces a 6-page printable situation report
-        from the Shortage Radar page. Each generation is logged here with a timestamp, the country it covers, and whether
-        the AI executive summary was successfully produced. Data imports staged through the Data Import page are also
-        listed for audit and traceability.
+        <strong className="text-slate-800">About this page:</strong> Medisignal produces three types of reports —
+        <strong> Situation Reports</strong> from the Shortage Radar, <strong>Forecast Reports</strong> from the Predictions page,
+        and <strong>Advisory Briefings</strong> from the AI Supply Advisor. Each generation is logged here with a timestamp,
+        the country it covers, and whether AI content was successfully produced. In production, this history would be
+        stored server-side for audit purposes rather than in browser storage.
       </div>
     </div>
   );

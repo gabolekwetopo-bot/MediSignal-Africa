@@ -1,7 +1,10 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Send, Sparkles } from 'lucide-react';
+import { Send, Sparkles, Printer, Loader2 } from 'lucide-react';
 import { useCountry } from '../context/CountryContext';
+import { supabase } from '../supabase';
+import { generateAdvisorReportHTML, downloadAdvisorReport } from '../lib/advisorReportGenerator';
+import { addReportHistory } from '../lib/reportHistory';
 
 interface Message {
   id: string;
@@ -26,6 +29,7 @@ export function AISupplyAdvisorPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -148,6 +152,85 @@ export function AISupplyAdvisorPage() {
     }
   }
 
+  async function handleGenerateReport() {
+    if (messages.length === 0 || isGeneratingReport) return;
+    setIsGeneratingReport(true);
+
+    try {
+      const firstUserMessage = messages.find(m => m.role === 'user');
+      const question = firstUserMessage?.content ?? 'Medisignal supply chain advisory session';
+
+      // Fetch live supply context for the tables
+      let supplyContext: any = null;
+      try {
+        const { data } = await supabase.rpc('get_supply_context', { country_filter: country });
+        supplyContext = data;
+      } catch {}
+
+      // Call the AI edge function for the narrative
+      let narrative = '';
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+        const conversation = messages
+          .filter(m => !m.isError)
+          .map(m => ({ role: m.role, content: m.content }));
+
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-advisor-report`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question, conversation, country }),
+            signal: controller.signal,
+          }
+        );
+        clearTimeout(timeoutId);
+
+        if (resp.ok) {
+          const json = await resp.json();
+          narrative = json.narrative || '';
+        }
+      } catch {}
+
+      // Fallback narrative if AI fails
+      if (!narrative) {
+        narrative = `This briefing summarises an advisory session conducted on ${new Date().toLocaleDateString('en-GB')} regarding the medicine supply situation${country ? ` in ${country}` : ' across all covered countries'}. The session addressed the question: "${question}". Detailed findings and live supporting data are provided below.\n\nFINDINGS:\n- See the supporting tables for the current at-risk medicines and facilities.\n- The supply snapshot was drawn directly from the live Medisignal database.\n- Redistribution opportunities and delayed orders are listed in the supporting data.\n\nACTIONS:\n- Review the medicines at risk table and prioritise redistribution where possible.\n- Escalate any delayed procurement orders that align with projected stockouts.\n- Re-run the advisory session after corrective actions to confirm risk levels have improved.`;
+      }
+
+      const html = generateAdvisorReportHTML({
+        question,
+        conversation: messages
+          .filter(m => !m.isError)
+          .map(m => ({ role: m.role, content: m.content })),
+        country,
+        narrative,
+        supplyContext,
+        generatedAt: new Date().toISOString(),
+      });
+
+      downloadAdvisorReport(html, country);
+      addReportHistory({
+        kind: 'advisory',
+        label: 'Advisory Briefing',
+        country: country ?? 'All Africa',
+        format: 'HTML → PDF',
+        summaryIncluded: !!narrative,
+        payload: {
+          question,
+          conversation: messages
+            .filter(m => !m.isError)
+            .map(m => ({ role: m.role, content: m.content })),
+        },
+      });
+    } catch (err) {
+      console.error('Report generation failed:', err);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  }
+
   function handleSend() {
     const q = inputValue.trim();
     if (!q || isStreaming) return;
@@ -174,12 +257,23 @@ export function AISupplyAdvisorPage() {
           </p>
         </div>
         {messages.length > 0 && (
-          <button
-            onClick={() => setMessages([])}
-            className="text-xs text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded border border-slate-200 hover:border-slate-300"
-          >
-            New Chat
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleGenerateReport}
+              disabled={isGeneratingReport || isStreaming}
+              className="inline-flex items-center gap-1.5 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-300 text-white rounded-md px-3 py-1.5 text-xs font-semibold transition"
+              title="Generate a printable advisory briefing from this conversation"
+            >
+              {isGeneratingReport ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />}
+              {isGeneratingReport ? 'Generating…' : 'Generate Full Report'}
+            </button>
+            <button
+              onClick={() => setMessages([])}
+              className="text-xs text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded border border-slate-200 hover:border-slate-300"
+            >
+              New Chat
+            </button>
+          </div>
         )}
       </div>
 
@@ -297,3 +391,6 @@ export function AISupplyAdvisorPage() {
     </div>
   );
 }
+
+
+

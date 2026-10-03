@@ -19,9 +19,7 @@ export function HeroPage() {
       {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">M</span>
-          </div>
+          <img src="/logo.svg" alt="Medisignal" className="w-9 h-9 rounded-lg" />
           <div>
             <div className="text-white font-semibold text-sm leading-tight">Medisignal</div>
             <div className="text-slate-500 text-[10px] uppercase tracking-wider">Africa</div>
@@ -195,4 +193,5 @@ export function HeroPage() {
     </div>
   );
 }
+
 
