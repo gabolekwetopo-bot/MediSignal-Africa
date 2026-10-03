@@ -70,15 +70,25 @@ export function ConsumptionPage() {
   useEffect(() => {
     let cancelled = false;
     async function loadSummary() {
-      const { data } = await supabase.rpc('get_consumption_summary', {
+      const [facRes, medRes, consRes] = await Promise.all([
+        country
+          ? supabase.from('facilities').select('*', { count: 'exact', head: true }).eq('country', country)
+          : supabase.from('facilities').select('*', { count: 'exact', head: true }),
+        supabase.from('medicines').select('*', { count: 'exact', head: true }),
+        supabase.from('consumption').select('*', { count: 'exact', head: true }),
+      ]);
+      if (cancelled) return;
+      // Get actual totals via lightweight KPI function
+      const { data: kpiData } = await supabase.rpc('get_consumption_kpis', {
         country_filter: country ?? null,
       });
-      if (cancelled) return;
-      const list = (data ?? []) as AggregateRow[];
-      const totalUnits = list.reduce((s, r) => s + Number(r.total_quantity ?? 0), 0);
-      const facilities = new Set(list.map(r => r.facility_name)).size;
-      const medicines = new Set(list.map(r => r.medicine_name)).size;
-      setSummary({ totalPairs: list.length, totalUnits, facilities, medicines });
+      const k = (kpiData ?? {}) as any;
+      setSummary({
+        totalPairs: k.total_records ?? consRes.count ?? 0,
+        totalUnits: k.total_units ?? 0,
+        facilities: k.facility_count ?? facRes.count ?? 0,
+        medicines: k.medicine_count ?? medRes.count ?? 0,
+      });
     }
     loadSummary();
     return () => { cancelled = true; };
@@ -236,4 +246,7 @@ export function ConsumptionPage() {
     </div>
   );
 }
+
+
+
 
