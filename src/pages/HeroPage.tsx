@@ -16,6 +16,46 @@ export function HeroPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white overflow-y-auto">
+      <style>{`
+        @keyframes radar-sweep {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 0.15; transform: scale(1); }
+          50% { opacity: 0.9; transform: scale(1.4); }
+        }
+        @keyframes drift {
+          0% { transform: translate(0, 0); }
+          50% { transform: translate(20px, -20px); }
+          100% { transform: translate(0, 0); }
+        }
+        @keyframes grid-shift {
+          from { background-position: 0 0; }
+          to { background-position: 60px 60px; }
+        }
+        @keyframes float-cross {
+          0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.03; }
+          50% { transform: translateY(-20px) rotate(5deg); opacity: 0.06; }
+        }
+        .radar-sweep {
+          animation: radar-sweep 20s linear infinite;
+          transform-origin: center;
+        }
+        .pulse-dot {
+          animation: pulse-dot 3s ease-in-out infinite;
+        }
+        .drift-slow {
+          animation: drift 25s ease-in-out infinite;
+        }
+        .grid-shift {
+          animation: grid-shift 40s linear infinite;
+        }
+        .float-cross {
+          animation: float-cross 12s ease-in-out infinite;
+        }
+      `}</style>
+
       {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -25,29 +65,109 @@ export function HeroPage() {
             <div className="text-slate-500 text-[10px] uppercase tracking-wider">Africa</div>
           </div>
         </div>
-        <span className="text-[10px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 px-2 py-1 rounded">
-          Demonstration Data
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 px-2 py-1 rounded">
+            Demonstration Data
+          </span>
+          <Link to="/dashboard" className="text-xs text-slate-400 hover:text-cyan-400 transition inline-flex items-center gap-1">
+            Skip to Dashboard
+            <ArrowRight size={12} />
+          </Link>
+        </div>
       </div>
 
       {/* Hero section */}
-      <div className="relative min-h-screen flex items-center justify-center px-6 py-24">
-        {/* Background gradient */}
+      <div className="relative min-h-screen flex items-center justify-center px-6 py-24 overflow-hidden">
+        {/* Base gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
-        {/* Subtle grid */}
+
+        {/* Animated grid */}
         <div
-          className="absolute inset-0 opacity-30"
+          className="grid-shift absolute inset-0 opacity-25"
           style={{
             backgroundImage:
-              'linear-gradient(rgba(6, 182, 212, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.08) 1px, transparent 1px)',
+              'linear-gradient(rgba(6, 182, 212, 0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.09) 1px, transparent 1px)',
             backgroundSize: '60px 60px',
           }}
         />
-        {/* Glow */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-cyan-500/10 blur-3xl" />
 
-        <div className="relative max-w-4xl text-center">
-          <div className="inline-flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/30 rounded-full px-3 py-1 mb-6">
+        {/* Radar sweep */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+          <div className="relative w-[900px] h-[900px] max-w-none sm:max-w-[900px]">
+            {/* Concentric circles */}
+            <div className="absolute inset-0 rounded-full border border-cyan-500/10" />
+            <div className="absolute inset-[12%] rounded-full border border-cyan-500/12" />
+            <div className="absolute inset-[28%] rounded-full border border-cyan-500/15" />
+            <div className="absolute inset-[44%] rounded-full border border-cyan-500/18" />
+            {/* Rotating sweep */}
+            <div className="radar-sweep absolute inset-0">
+              <div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: 'conic-gradient(from 0deg, rgba(6,182,212,0) 0deg, rgba(6,182,212,0.14) 60deg, rgba(6,182,212,0) 120deg)',
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Center glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-cyan-500/10 blur-3xl drift-slow" />
+
+        {/* Floating pulse dots */}
+        <div className="absolute inset-0 pointer-events-none">
+          {[
+            { top: '18%', left: '12%', color: 'bg-cyan-400' },
+            { top: '28%', left: '82%', color: 'bg-emerald-400' },
+            { top: '72%', left: '8%', color: 'bg-orange-400' },
+            { top: '62%', left: '88%', color: 'bg-cyan-400' },
+            { top: '82%', left: '52%', color: 'bg-cyan-400' },
+            { top: '12%', left: '48%', color: 'bg-emerald-400' },
+            { top: '45%', left: '22%', color: 'bg-cyan-400' },
+            { top: '55%', left: '76%', color: 'bg-orange-400' },
+          ].map((dot, i) => (
+            <span
+              key={i}
+              className={`pulse-dot absolute w-2 h-2 rounded-full ${dot.color}`}
+              style={{
+                top: dot.top,
+                left: dot.left,
+                boxShadow: dot.color === 'bg-cyan-400'
+                  ? '0 0 12px rgba(34,211,238,0.9)'
+                  : dot.color === 'bg-emerald-400'
+                  ? '0 0 12px rgba(52,211,153,0.9)'
+                  : '0 0 12px rgba(251,146,60,0.9)',
+                animationDelay: `${i * 0.4}s`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Floating medical crosses */}
+        <div className="absolute inset-0 pointer-events-none">
+          {[
+            { top: '15%', left: '22%', delay: '0s', size: 'w-8 h-8' },
+            { top: '70%', left: '18%', delay: '2s', size: 'w-6 h-6' },
+            { top: '25%', left: '75%', delay: '4s', size: 'w-10 h-10' },
+            { top: '80%', left: '78%', delay: '6s', size: 'w-7 h-7' },
+            { top: '48%', left: '5%', delay: '3s', size: 'w-5 h-5' },
+            { top: '55%', left: '93%', delay: '5s', size: 'w-6 h-6' },
+          ].map((cross, i) => (
+            <svg
+              key={i}
+              className={`float-cross absolute ${cross.size} text-cyan-400`}
+              style={{ top: cross.top, left: cross.left, animationDelay: cross.delay }}
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M10 2h4v6h6v4h-6v6h-4v-6H4V8h6V2z" />
+            </svg>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="relative max-w-4xl text-center z-10">
+          <div className="inline-flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/30 rounded-full px-3 py-1 mb-6 backdrop-blur-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
             <span className="text-cyan-300 text-[11px] font-medium uppercase tracking-wider">
               AI-Powered Supply Chain Intelligence
@@ -80,21 +200,20 @@ export function HeroPage() {
             </Link>
             <Link
               to="/ai-advisor"
-              className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-md px-6 py-3 text-sm font-semibold transition"
+              className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-md px-6 py-3 text-sm font-semibold transition backdrop-blur-sm"
             >
               <Sparkles size={16} />
               Try the AI Advisor
             </Link>
           </div>
 
-          {/* Stats */}
           <div className="mt-16 grid grid-cols-3 gap-4 max-w-2xl mx-auto">
             {[
               { value: '198', label: 'Health Facilities' },
               { value: '4', label: 'African Countries' },
               { value: '55', label: 'Essential Medicines' },
             ].map(s => (
-              <div key={s.label} className="border border-white/10 bg-white/5 rounded-lg py-5">
+              <div key={s.label} className="border border-white/10 bg-white/5 rounded-lg py-5 backdrop-blur-sm">
                 <div className="text-3xl sm:text-4xl font-bold text-white tabular-nums">{s.value}</div>
                 <div className="text-[11px] uppercase tracking-wider text-slate-400 mt-1">{s.label}</div>
               </div>
@@ -146,7 +265,7 @@ export function HeroPage() {
           <FileText size={28} className="mx-auto text-cyan-400 mb-4" />
           <h2 className="text-3xl font-semibold tracking-tight">Government-grade output</h2>
           <p className="text-slate-400 mt-3 max-w-2xl mx-auto text-sm leading-relaxed">
-            Medisignal generates printable 6-page national situation reports with AI-written executive summaries —
+            Medisignal generates printable national situation reports with AI-written executive summaries —
             ready for ministry briefings, donor reporting, and health policy decisions.
           </p>
           <Link
@@ -193,5 +312,3 @@ export function HeroPage() {
     </div>
   );
 }
-
-
