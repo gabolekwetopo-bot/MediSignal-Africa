@@ -52,8 +52,7 @@ export function generateForecastHTML(params: ForecastReportParams): string {
   const { country, label, startDate, endDate, rows, narrative } = params;
 
   const countryName = country ?? 'All Africa';
-  const countrySlug = country ?? 'africa';
-
+  
   const criticalCount = rows.filter(r => r.risk_level === 'Critical').length;
   const highCount = rows.filter(r => r.risk_level === 'High').length;
   const facilitiesAffected = new Set(rows.map(r => r.facility_id)).size;
@@ -186,6 +185,7 @@ export function downloadForecastReport(html: string, country: string | null, lab
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
 
 
 

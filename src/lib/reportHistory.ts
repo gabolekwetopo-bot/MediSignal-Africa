@@ -9,6 +9,12 @@ export interface ReportHistoryEntry {
   generatedAt: string;
   format: string;
   summaryIncluded: boolean;
+  payload?: {
+    question?: string;
+    conversation?: { role: 'user' | 'assistant'; content: string }[];
+    windowStart?: string;
+    windowEnd?: string;
+  };
 }
 
 const STORAGE_KEY = 'medisignal.report-history';
@@ -20,7 +26,6 @@ export function getReportHistory(): ReportHistoryEntry[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    // Normalize old entries that don't have a kind
     return parsed.map((e: any) => ({
       id: e.id ?? `legacy-${Math.random().toString(36).slice(2)}`,
       kind: e.kind ?? 'situation',
@@ -30,24 +35,31 @@ export function getReportHistory(): ReportHistoryEntry[] {
       generatedAt: e.generatedAt ?? new Date().toISOString(),
       format: e.format ?? 'HTML → PDF',
       summaryIncluded: !!e.summaryIncluded,
+      payload: e.payload ?? undefined,
     }));
   } catch {
     return [];
   }
 }
 
-export function addReportHistory(entry: Omit<ReportHistoryEntry, 'id' | 'generatedAt'> & { generatedAt?: string }): void {
+export function addReportHistory(
+  entry: Omit<ReportHistoryEntry, 'id' | 'generatedAt'> & { generatedAt?: string }
+): string {
   try {
     const existing = getReportHistory();
+    const id = `report-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const full: ReportHistoryEntry = {
-      id: `report-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id,
       generatedAt: entry.generatedAt ?? new Date().toISOString(),
       ...entry,
     };
     existing.unshift(full);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing.slice(0, 100)));
     window.dispatchEvent(new Event('medisignal-report-added'));
-  } catch {}
+    return id;
+  } catch {
+    return '';
+  }
 }
 
 export function clearReportHistory(): void {

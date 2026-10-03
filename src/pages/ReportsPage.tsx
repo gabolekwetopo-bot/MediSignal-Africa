@@ -29,7 +29,7 @@ export function ReportsPage() {
   const { country } = useCountry();
   const [tab, setTab] = useState<Tab>('reports');
   const [imports, setImports] = useState<ImportRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [reports, setReports] = useState<ReportHistoryEntry[]>([]);
   const [kindFilter, setKindFilter] = useState<ReportKind | ''>('');
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
@@ -349,4 +349,5 @@ export function ReportsPage() {
     </div>
   );
 }
+
 
